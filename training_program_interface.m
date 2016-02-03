@@ -1,4 +1,4 @@
-function [E_t_best E_v_best] = training_program_interface(training_file, N, M, Nh, Nit, validation_file, file_type, Extra)
+function [selected_subset] = training_program_interface(training_file, N, M, Nh, Nit, validation_file, file_type, Extra)
 %TRAINING_PROGRAM_INTERFACE Wrapper for the training program.
 %
 %  This program is a wrapper for the real training program. It receives
@@ -11,12 +11,30 @@ function [E_t_best E_v_best] = training_program_interface(training_file, N, M, N
 %  Rohit Rawat (rohitrawat@gmail.com), 08-23-2015
 %  $Revision: 1 $ $Date: 23-Aug-2015 15:50:31 $
 
-E_t_best = NaN;
-E_v_best = NaN;
+if(strcmp(validation_file, 'SPLIT_IT'))
+    disp('Splitting the trainng file to create a validation file.');
+    if(file_type == 1)
+        [x t Nv] = read_approx_file(training_file, N, M);
+    else
+        [x t Nv] = read_class_file(training_file, N, M);
+    end
+    ratio = 0.7;
+    Nvt = round(Nv*ratio);
+    training_file = 'temp_trg.tra';
+    validation_file = 'temp_val.val';
+    dlmwrite(training_file, [x(1:Nvt,:) t(1:Nvt,:)], '\t');
+    dlmwrite(validation_file, [x(Nvt+1:end,:) t(Nvt+1:end,:)], '\t');
+end
+
 if(file_type == 1)
     % call the program for regression case here:
-    [E_t_best E_v_best Nh_best Nit_best Wi_best Wo_best lambda] = mlp_TRAIN(training_file, N, M, Nh, Nit, validation_file);
+    command = sprintf('./fsbin/fs_reg_lnx64 \"%s\" \"%s\" %d %d %d', training_file, validation_file, N, M, 0);
+    system(command);
 else
     % call the program for classification case here:
-    [E_t_best E_v_best Nh_best Nit_best Wi_best Wo_best lambda] = mlp_TRAIN_CLASS(training_file, N, M, Nh, Nit, validation_file);
+    command = sprintf('./fsbin/fs_class_lnx64 \"%s\" \"%s\" %d %d %d', training_file, validation_file, N, M, 1);
+    system(command);
 end
+
+selected_subset = dlmread('final_feature_order.txt')';
+

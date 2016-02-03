@@ -31,19 +31,19 @@ function value = resources(ID)
 
 switch(ID);
     case 'Info'
-        value = {'MLP Training Program',
+        value = {'Feature Selection Program',
             '',
             'Algorithm: MOLF-ADAPT',
             '',
-            'Author: Rohit Rawat & Jignesh Patel',
+            'Author: Rohit Rawat & Jiang Li',
             '',
             'http://www.uta.edu/faculty/manry/'};
     case 'TrainTitle'
-        value = 'MLP Training Program';
+        value = 'Feature Selection Program';
     case 'TestTitle'
-        value = 'MLP Testing Program';
+        value = 'NA';
     case 'CodeDirectory'
-        value = 'hwo_molf_pruning';
+        value = 'fsbin';
     case 'N'  % Row 4
         value = 'Inputs (N)';
     case 'M'  % Row 5
