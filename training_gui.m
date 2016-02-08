@@ -5,6 +5,11 @@ function training_gui
 % rohitrawat@gmail.com
 close all;
 
+    chosenSubsetSize = 0;
+    all_subsets_matrix = [];
+    
+    convert_files_list = [];
+
    training_file = '';
    validation_file = '';
    testing_file = '';
@@ -26,9 +31,11 @@ close all;
    hGap = 10;
    hTotalWidth = 800;
    vTotalHeight = 600;
+%    N = 0;
    
    %  Create and then hide the GUI as it is being constructed.
-   f = figure('Visible','off','Position',[10,10,hTotalWidth,vTotalHeight],'Name',resources('TrainTitle'),'NumberTitle','off','Menubar','none','Color',[0.8 0.8 0.8]);
+   f = figure('Visible','off','Position',[10,10,hTotalWidth,vTotalHeight],'Name',resources('TrainTitle'),'NumberTitle','off','Menubar','none','Color',[0.8 0.8 0.8],'Resize','off');
+   set(f,'CloseRequestFcn','cleanup');
    
    labelWidths = 150;
    buttonWidths = 150;
@@ -100,7 +107,7 @@ close all;
  
    row = row+1;
    tl = [hOrigin vOrigin+(row-1)*(vHeight+vGap)];
-   [htextInputs tr bl] = makeControl(tl, labelWidths, 'text', resources('N'));
+   [htextInputs tr bl0] = makeControl(tl, labelWidths, 'text', resources('N'));
    [heditInputs tr bl] = makeControl(tr, labelWidths, 'edit', '');
    if(length(resources('N'))==0)
        set(htextInputs, 'Visible', 'off');
@@ -117,7 +124,8 @@ close all;
    end
    
    [hbuttonTrain tr bl] = makeControl(tr, buttonWidths - hOrigin, 'pushbutton', 'START', @train_Callback);
-   [htextStatus1 tr bl] = makeControl(tr, round(labelWidths/2), 'text', 'Status:');
+   
+   [htextStatus1 tr bl] = makeControl(bl0, round(labelWidths/2), 'text', 'Status:');
    [htextStatus tr bl] = makeControl(tr, labelWidths, 'text', 'Ready.');
    set(htextStatus, 'HorizontalAlignment', 'left');
    set(hbuttonTrain, 'FontWeight', 'bold');
@@ -138,8 +146,13 @@ close all;
    tl = [hOrigin vOrigin+(row-1)*(vHeight+vGap)];
    [heditValErr tr bl] = makeControl(tl, [labelWidths*2 200], 'edit', '');
    set(heditValErr, 'Enable', 'off');
+   set(heditValErr, 'Max', 4);
  
-   [hbuttonHelp tr bl] = makeControl(bl, buttonWidths, 'pushbutton', 'Show table', @help_Callback);
+   [hbuttonTable tr bl] = makeControl(bl, buttonWidths, 'pushbutton', 'Show table', @table_Callback);
+   [hbuttonSave tr bl] = makeControl(tr, buttonWidths, 'pushbutton', 'Save Files', @save_Callback);
+
+               set(hbuttonTable, 'Enable', 'off');
+            set(hbuttonSave, 'Enable', 'off');
 
    [hbuttonHelp tr bl] = makeControl(bl, buttonWidths, 'pushbutton', 'Help', @help_Callback);
 
@@ -311,14 +324,40 @@ close all;
             delete('plnSelectionResults.txt')
             delete('plnValidationResults.txt')
             delete('final_feature_order.txt')
+            
             [selected_subset] = training_program_interface(training_file, N, M, Nh, Nit, validation_file, file_type, Extra);
+            
+            if(isempty(selected_subset))
+                msgbox('There was an error running the feature selection program. Please check the console for any error messages.');
+                set(htextStatus, 'String', 'Failed!');
+                set(heditTrgErr, 'String', length(selected_subset));
+                set(heditValErr, 'String', 'Please check the console for error messages. Veify you used the correct values for N, M, and set the correct file type (regression or classification).');
+                set(heditValErr, 'Enable', 'on');
+                return;
+            end
+            
+            [all_subsets all_errors] = read_featsel_results('plnSelectionResults.txt', N);
+            [all_subsets_v all_errors_v] = read_featsel_results('plnValidationResults.txt', N);
+            stage1_order = dlmread('stage1_selected_features.txt');
+
+            N1 =length(all_subsets);
+            all_subsets_matrix = zeros(N1, N1+2);
+            for i=1:N1
+                all_subsets_matrix(i,1) = all_errors(i);
+                all_subsets_matrix(i,2) = all_errors_v(i);
+                all_subsets_matrix(i,3:2+i) = stage1_order(all_subsets{i});
+            end
+            % all_subsets_matrix
+            
+            chosenSubsetSize = length(selected_subset);
+            
             set(htextStatus, 'String', 'Ready.');
             set(heditTrgErr, 'String', length(selected_subset));
             set(heditValErr, 'String', sprintf('%d, ', selected_subset));
             set(heditValErr, 'Enable', 'on');
             
-            [all_subsets all_errors] = read_featsel_results('plnSelectionResults.txt', N);
-            [all_subsets_v all_errors_v] = read_featsel_results('plnValidationResults.txt', N);
+            set(hbuttonTable, 'Enable', 'on');
+            set(hbuttonSave, 'Enable', 'on');
 
             axis([1 N 0 0.0001])
             plot([all_errors all_errors_v], '.-');
@@ -370,5 +409,133 @@ close all;
        end
    end
 
+   function table_Callback(source,eventdata)
+        f = figure('Position',[200 200 600 600],'Resize','off', 'NumberTitle','off', 'Name', 'All Subsets (features not shown were eliminted as noise)');
+        
+        [all_subsets all_errors] = read_featsel_results('plnSelectionResults.txt', N);
+        [all_subsets_v all_errors_v] = read_featsel_results('plnValidationResults.txt', N);
+        stage1_order = dlmread('stage1_selected_features.txt');
+        
+        N =length(all_subsets);
+        dat = cell(N,4);
+        for i=1:N
+            dat{i,1} = i;
+            dat{i,2} = sprintf('%.3f', all_errors(i));
+            dat{i,3} = sprintf('%.3f', all_errors_v(i));
+            dat{i,4} = sprintf('%d, ', stage1_order(all_subsets{i}));
+        end
+
+            
+%         dat = rand(4); 
+        file_type = get(hradioTypeReg, 'Value');
+        if(file_type == 1)
+            cnames = {'Subset Size', 'Trg MSE','Val MSE','Features'};
+        else
+            cnames = {'Subset Size', 'Trg Acc','Val Acc','Features'};
+        end
+        cformat = {'numeric', 'numeric', 'numeric', 'char'};
+        t = uitable('Parent',f,'Units','normalized','Position',...
+                    [0.05 0.05 0.9 0.9],'Data',dat,'ColumnName',cnames,... 
+                    'ColumnFormat', cformat);
+        set(t,'ColumnWidth',{'auto' 'auto' 'auto' 500})
+   end
+
+   function save_Callback(source,eventdata)
+        f = figure('Position',[200 200 700 600],'Resize','off','NumberTitle','off','Name','Generate subsetted versions of files');
+        
+        convert_files_list = [];
+        
+%         training_file = get(heditTrgFile, 'String');
+        convert_files_list = training_file;
+        valfileOn = get(hcheckValFile, 'Value');
+        if(valfileOn)
+            validation_file = get(heditValFile, 'String');
+            convert_files_list = sprintf('%s\n%s', convert_files_list, validation_file);
+        end
+        
+       row = 1;
+       tl = [hOrigin vOrigin+(row-1)*vHeight];
+       [htextSize tr bl0] = makeControl(tl, labelWidths, 'text', 'Subset size:');
+       [heditSize tr bl] = makeControl(tr, labelWidths, 'edit', num2str(chosenSubsetSize));
+       
+       [htextTrgFile tr bl0] = makeControl(bl0, labelWidths*3, 'text', 'Choose the files to subset (input files were automatically added):');
+       [hbuttonBrowseTrgFile tr bl] = makeControl(tr, buttonWidths, 'pushbutton', 'Add More Files..', @add_button_Callback);
+       
+       [heditFiles tr bl] = makeControl(bl0, [650 400], 'edit', convert_files_list);
+       set(heditFiles, 'Max', 4);
+
+       [hbuttonConvert tr bl] = makeControl(bl, buttonWidths, 'pushbutton', 'Convert', @startConversion);
+       
+
+
+            % --- Executes on button press in add_button.
+            function add_button_Callback(hObject, eventdata, handles)
+            % hObject    handle to add_button (see GCBO)
+            % eventdata  reserved - to be defined in a future version of MATLAB
+            % handles    structure with handles and user data (see GUIDATA)
+
+            % Get the files
+            [FileName, PathName, FilterIndex] = uigetfile(fullfile(lastDir,'*.*'),'Select more files to apply subsetting to', 'MultiSelect', 'on');
+
+            ok = 0;
+            file_list_text = '';
+            myFileNames = '';
+            if(ischar(FileName))
+                file_list_text = [file_list_text; FileName];
+                myFileNames = strcat(PathName, FileName);
+            elseif iscell(FileName)
+                for i=1:size(FileName,2)
+                    FileName(i)
+                    file_list_text = [file_list_text; FileName(i)];
+                    myFileNames = sprintf('%s\n%s', myFileNames, strcat(PathName, FileName{i}));
+                end
+            end
+
+            convert_files_list = sprintf('%s\n%s', convert_files_list, myFileNames);
+            set(heditFiles, 'String', convert_files_list);
+
+        %     if(ok)
+        %         set(handles.file_list, 'String', handles.file_list_text);
+        %     end
+        % 
+        %     % Update handles structure
+        %     guidata(hObject, handles);
+            end
+            
+       function startConversion(hObject, eventdata, handles)
+           selcols = all_subsets_matrix(chosenSubsetSize,3:2+chosenSubsetSize);
+           remain = convert_files_list; %get(heditFiles, 'String')
+           status = 'FINISHED. Converted files list:';
+           delim = sprintf('\n');
+           while(true)
+               [token remain] = strtok(remain, delim);
+               fprintf('token: %s\n', token);
+               if isempty(token),  break;  end
+               if(length(token) == 0)
+                   continue;
+               end
+               fname = token;
+               
+               strN = get(heditInputs, 'String');
+        N = str2double(strN);
+               if(exist(fname, 'file'))
+                   fprintf('Converting %s\n', fname);
+                   outname = sprintf('%s.subset', fname);
+                   fprintf('To: %s\n', outname);
+                   status = sprintf('%s\n%s', status, outname);
+                       if(file_type == 1)
+                            [x t Nv] = read_approx_file(fname, N, M);
+                        else
+                            [x t Nv] = read_class_file(fname, N, M);
+                       end
+                       x1 = x(:,selcols);
+                       dlmwrite(outname, [x1 t], '\t');
+               end
+           end
+           status = sprintf('%s\nGenerated files contain %d inputs and same outputs.', status, length(selcols));
+           set(heditFiles, 'String', status);
+       end
  
+   end
+
 end

@@ -31,6 +31,3 @@ fclose(fid);
 all_o(n:N) = [];
 all_errors(n:N) = [];
 
-disp('Selected features:');
-disp(all_errors);
-

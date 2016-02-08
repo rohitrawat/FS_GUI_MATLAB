@@ -26,15 +26,26 @@ if(strcmp(validation_file, 'SPLIT_IT'))
     dlmwrite(validation_file, [x(Nvt+1:end,:) t(Nvt+1:end,:)], '\t');
 end
 
+if(isunix)
+    platform = 'lnx64';
+else
+    platform = 'win64.exe';
+end
+
 if(file_type == 1)
     % call the program for regression case here:
-    command = sprintf('./fsbin/fs_reg_lnx64 \"%s\" \"%s\" %d %d %d', training_file, validation_file, N, M, 0);
+    command = sprintf('./fsbin/fs_reg_%s \"%s\" \"%s\" %d %d %d', platform, training_file, validation_file, N, M, 0);
     system(command);
 else
     % call the program for classification case here:
-    command = sprintf('./fsbin/fs_class_lnx64 \"%s\" \"%s\" %d %d %d', training_file, validation_file, N, M, 1);
+    command = sprintf('./fsbin/fs_class_%s \"%s\" \"%s\" %d %d %d', platform, training_file, validation_file, N, M, 1);
     system(command);
 end
 
-selected_subset = dlmread('final_feature_order.txt')';
+if(exist('final_feature_order.txt', 'file'))
+    selected_subset = dlmread('final_feature_order.txt')';
+else
+    selected_subset = [];
+end
 
+% selected_subset = [];
