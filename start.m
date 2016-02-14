@@ -1,4 +1,4 @@
-function run_training()
+function start()
 %RUN_TRAINING A GUI for training a neural network.
 %
 %  This program is a graphical user interface for running various neural
